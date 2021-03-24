@@ -30,7 +30,7 @@ int main()
     string fn_src = "/home/tiliang/Pictures/scene.jpg";
     img = imread(fn_src, IMREAD_GRAYSCALE);
 
-    const int threshold = 20;
+    const int threshold = 6;
 
     /******************************************************************************************/
 
@@ -70,15 +70,13 @@ int main()
 
     // schedule
     Var yo("yo"), yi("yi");
-    const int ves_size_short = 8;
-    //is_corner.vectorize(x, ves_size_short);
-    //score.compute_at(is_corner, yi).store_at(is_corner, yo);
-    //min_max_vals.compute_at(score, x).vectorize();
-    score.compute_root();
+    const int vec_size_short = get_host_target().natural_vector_size<short>();
+    is_corner.split(y, yo, yi, 32).parallel(yo).vectorize(x, vec_size_short);
+    score.compute_at(is_corner, yi).store_at(is_corner, yo).vectorize(x, vec_size_short);
 
     // test
-    //    is_corner.print_loop_nest();
-    //    is_corner.compile_to_lowered_stmt("isCorner.html", {}, HTML);
+    is_corner.print_loop_nest();
+    is_corner.compile_to_lowered_stmt("isCorner.html", {}, HTML);
     Buffer<bool> output(input.width() - 8, input.height() - 8);
     output.set_min(4, 4);
     is_corner.realize(output);
@@ -115,11 +113,11 @@ int main()
 #if 1
     vector<KeyPoint> result_ocv;
     // benchmark
-    double time_hld = Tools::benchmark(3, 10, [&] {
+    double time_hld = Tools::benchmark(3, 1, [&] {
         is_corner.realize(output);
     });
     double time_ocv = Tools::benchmark(3, 10, [&] {
-        FAST(img, result_ocv, 20, true);
+        FAST(img, result_ocv, threshold, true);
     });
     printf("ocv: pts[%zu] time[%f ms]\n", result_ocv.size(), time_ocv * 1e3);
     printf("hld: pts[%zu] time[%f ms]\n", result_hld.size(), time_hld * 1e3);
@@ -135,7 +133,7 @@ int main()
     imshow("ocv", img_ocv);
     imshow("hld", img_hld);
     imshow("diff", (img_hld - img_ocv) > 0);
-    waitKey(0);
+    //waitKey(0);
 #endif
     return 0;
 }
